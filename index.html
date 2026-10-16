@@ -60,12 +60,26 @@ label{font-size:13px;color:var(--mute);display:block;margin-bottom:3px}
 .crow select{font:inherit;font-size:13px;max-width:92px;padding:9px 4px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);margin-bottom:8px}
 .al2{padding:10px 0;border-top:1px solid var(--line)}.al2:first-of-type{border-top:0}
 .row2{display:flex;justify-content:space-between;font-size:15px;margin-bottom:2px}.row2 span{direction:ltr;font-weight:600}
+#printArea{display:none}
+@media print{
+  body>*:not(#printArea){display:none!important}
+  html,body{background:#fff!important}
+  #printArea{display:block!important;direction:rtl;color:#000!important;background:#fff!important;font-family:-apple-system,system-ui,sans-serif;padding:4px}
+  #printArea h1{font-size:19px;margin:0 0 4px}
+  #printArea h2{font-size:15px;margin:16px 0 6px}
+  #printArea .pd{font-size:11px;color:#555!important;margin-bottom:8px}
+  .pt{width:100%;border-collapse:collapse;font-size:13px}
+  .pt th,.pt td{border:1px solid #aaa;padding:6px 8px;text-align:right;color:#000!important}
+  .pt th{background:#eee!important}
+  .pt td.n{direction:ltr;text-align:left}
+  .pt tr{page-break-inside:avoid}
+}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="nav"><button id="nx" aria-label="الشهر التالي">▶</button><b id="mt"></b><button id="pv" aria-label="الشهر السابق">◀</button></div>
-  <div class="nav" style="margin-top:-4px;justify-content:flex-end"><button id="gear" aria-label="الإعدادات">⚙️</button></div>
+  <div class="nav" style="margin-top:-4px;justify-content:flex-end"><button id="prt" aria-label="طباعة">🖨️</button><button id="gear" aria-label="الإعدادات">⚙️</button></div>
   <div id="hero"></div>
   <div class="card"><h3>هاد الشهر</h3><div class="fields">
     <div><label>صافي الدخل (MAD)</label><input id="inc" type="number" inputmode="decimal"></div>
@@ -193,6 +207,21 @@ $('done').onclick=()=>{close('setS');render()};
 $('exp').onclick=async()=>{const t=JSON.stringify(S);$('bk').value=t;$('bk').select();try{await navigator.clipboard.writeText(t);$('exp').textContent='تم النسخ ✓'}catch(e){$('exp').textContent='حدد النص وانسخو يدويا'}};
 $('imp').onclick=()=>{try{const d=JSON.parse($('bk').value);if(!d.cats||!d.months)throw 0;if(!d.alloc)d.alloc=ALLOC.map(x=>({...x}));S=d;fix();drawCats();drawAlloc();render();$('imp').textContent='تم الاستيراد ✓'}catch(e){$('imp').textContent='النص غير صالح'}};
 render();
+function doPrint(){
+  let pa=$('printArea');if(!pa){pa=document.createElement('div');pa.id='printArea';document.body.appendChild(pa)}
+  const m=M(),ex=[...m.exp].sort((a,b)=>a.d-b.d),sp=ex.reduce((a,e)=>a+e.a,0),inc=m.inc,bud=m.bud;
+  const al=S.alloc||[],spb=al.map((x,i)=>ex.filter(e=>(catOf(e.c).b??0)==i).reduce((a,e)=>a+e.a,0));
+  const by=S.cats.map(c=>[c,ex.filter(e=>e.c==c.n).reduce((a,e)=>a+e.a,0)]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
+  const r=(a,b)=>`<tr><td>${a}</td><td class="n">${b}</td></tr>`;
+  let h=`<h1>My Budget — ${MN[vm]} ${vy}</h1><div class="pd">${iso(new Date())}</div>`;
+  h+=`<h2>الملخص</h2><table class="pt">`+r('صافي الدخل',inc?f(inc)+' MAD':'—')+r('الميزانية',bud?f(bud)+' MAD':'—')+r('المصروف',f(sp)+' MAD')+(bud?r('المتبقي من الميزانية',f(bud-sp)+' MAD'):'')+(inc?r('الادخار',f(inc-sp)+' MAD'):'')+`</table>`;
+  if(inc&&al.length){h+=`<h2>التقسيمة</h2><table class="pt"><tr><th>الخانة</th><th>النسبة</th><th>المخصص</th><th>المصروف</th><th>المتبقي</th></tr>`+al.map((x,i)=>{const a=inc*(parseFloat(x.p)||0)/100;return `<tr><td>${esc(x.n)}</td><td class="n">${f(parseFloat(x.p)||0)}%</td><td class="n">${f(a)}</td><td class="n">${f(spb[i])}</td><td class="n">${f(a-spb[i])}</td></tr>`}).join('')+`</table>`}
+  if(by.length){h+=`<h2>حسب الفئة</h2><table class="pt"><tr><th>الفئة</th><th>المبلغ</th><th>%</th></tr>`+by.map(([c,v])=>`<tr><td>${esc(c.n)}</td><td class="n">${f(v)}</td><td class="n">${Math.round(v/sp*100)}%</td></tr>`).join('')+`</table>`}
+  if(ex.length){h+=`<h2>المصاريف</h2><table class="pt"><tr><th>التاريخ</th><th>البيان</th><th>الفئة</th><th>المبلغ</th></tr>`+ex.map(e=>`<tr><td class="n">${iso(e.d)}</td><td>${esc(e.n||'')}</td><td>${esc(e.c)}</td><td class="n">${f(e.a)}</td></tr>`).join('')+`</table>`}
+  pa.innerHTML=h;
+  setTimeout(()=>window.print(),50);
+}
+$('prt').onclick=doPrint;
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 </body>
